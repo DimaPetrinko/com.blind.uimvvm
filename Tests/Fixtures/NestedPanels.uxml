@@ -1,0 +1,7 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Template name="CounterPanel" src="CounterPanel.uxml" />
+    <ui:VisualElement name="Screen">
+        <ui:Instance name="FirstCounter" template="CounterPanel" />
+        <ui:Instance name="SecondCounter" template="CounterPanel" />
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,30 @@
+{
+  "name": "com.blind.uimvvm",
+  "version": "0.4.0",
+  "displayName": "UI MVVM",
+  "description": "UI Toolkit MVVM primitives: reactive properties with disposable subscriptions, a View<TViewModel> base with scope-aware root resolution and automatic teardown, an awaitable screen-navigation stack with ready-made opener bases, awaitable USS transitions, a SafeArea element, an inspector that validates Root Name against the UXML, and audit helpers for the UXML-to-C# links the compiler cannot see. Requires UniTask (com.cysharp.unitask) in the consuming project.",
+  "unity": "6000.0",
+  "license": "MIT",
+  "keywords": [
+    "ui",
+    "ui-toolkit",
+    "uielements",
+    "mvvm",
+    "uxml",
+    "uss",
+    "data-binding",
+    "reactive",
+    "navigation",
+    "unitask"
+  ],
+  "documentationUrl": "https://github.com/DimaPetrinko/com.blind.uimvvm#readme",
+  "changelogUrl": "https://github.com/DimaPetrinko/com.blind.uimvvm/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/DimaPetrinko/com.blind.uimvvm/blob/main/LICENSE.md",
+  "dependencies": {
+    "com.unity.modules.uielements": "1.0.0"
+  },
+  "author": {
+    "name": "Dmytrii Petrinko",
+    "url": "https://github.com/DimaPetrinko"
+  }
+}

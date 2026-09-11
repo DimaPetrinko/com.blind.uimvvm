@@ -1,0 +1,12 @@
+{
+  "name": "Blind.UiMvvm",
+  "rootNamespace": "Blind.UiMvvm",
+  "references": [
+    "UniTask"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

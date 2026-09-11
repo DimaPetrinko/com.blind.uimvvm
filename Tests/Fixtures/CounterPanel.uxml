@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="CounterPanel">
+        <ui:Label name="CounterLabel">
+            <Bindings>
+                <ui:DataBinding property="text" data-source-path="Counter" binding-mode="ToTarget" />
+            </Bindings>
+        </ui:Label>
+        <ui:Button name="Reset" focusable="false" />
+    </ui:VisualElement>
+</ui:UXML>
