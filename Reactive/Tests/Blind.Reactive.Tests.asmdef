@@ -1,12 +1,10 @@
 {
-  "name": "Blind.UiMvvm.Tests",
-  "rootNamespace": "Blind.UiMvvm.Tests",
+  "name": "Blind.Reactive.Tests",
+  "rootNamespace": "Blind.Reactive.Tests",
   "references": [
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
-    "Blind.UiMvvm",
-    "Blind.Reactive",
-    "UniTask"
+    "Blind.Reactive"
   ],
   "includePlatforms": [
     "Editor"

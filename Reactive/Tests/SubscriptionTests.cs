@@ -1,14 +1,13 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using Blind.UiMvvm.Disposables;
-using Blind.UiMvvm.ReactiveProperties;
-using Blind.UiMvvm.ReactiveProperties.Implementation;
+using Blind.Reactive.Disposables;
+using Blind.Reactive.Implementation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 
-namespace Blind.UiMvvm.Tests
+namespace Blind.Reactive.Tests
 {
 	public class SubscriptionTests
 	{

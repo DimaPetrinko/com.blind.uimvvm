@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Blind.UiMvvm.Disposables
+namespace Blind.Reactive.Disposables
 {
 	/// <summary>
 	/// Owns a set of subscriptions and disposes them together, so a view model or view keeps one field
@@ -15,7 +15,7 @@ namespace Blind.UiMvvm.Disposables
 	/// resurrect a torn-down screen.
 	///
 	/// One throwing disposable does not strand the rest: exceptions are logged and disposal continues,
-	/// the same contract <see cref="ReactiveProperties.Implementation.ReactiveProperty{T}"/> gives its
+	/// the same contract <see cref="Implementation.ReactiveProperty{T}"/> gives its
 	/// handlers.
 	/// </summary>
 	public sealed class CompositeDisposable : IDisposable

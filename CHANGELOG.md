@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.5.0
+
+Reactive properties leave the UI assembly, so domain code can use them without compiling against
+UI Toolkit.
+
+### Changed - breaking
+
+- **`ReactiveProperties` and `Disposables` moved to a new `Blind.Reactive` assembly**, and their
+  namespaces moved with them. An assembly that only needs change-notifying values now references
+  `Blind.Reactive` and pulls in neither UI Toolkit nor UniTask. `Blind.UiMvvm` references it, so a
+  view keeps working unchanged once its `using` lines are updated.
+
+  | 0.4.0 | 0.5.0 |
+  |---|---|
+  | `Blind.UiMvvm.ReactiveProperties` | `Blind.Reactive` |
+  | `Blind.UiMvvm.ReactiveProperties.Implementation` | `Blind.Reactive.Implementation` |
+  | `Blind.UiMvvm.Disposables` | `Blind.Reactive.Disposables` |
+
+  The `ReactiveProperties` segment is gone because `Blind.Reactive.IReactiveProperty<T>` does not
+  stutter, and because leaving `UiMvvm` in the name of the one assembly that exists in order not to
+  be UI defeats the split. Nothing about the types themselves changed.
+
+- **`ViewBinding.TryBind` constrains to `IBindable<TViewModel>` rather than `View<TViewModel>`.**
+  Its body only ever called `Bind`, so the view constraint was narrower than the code needed and made
+  `Binding/` depend on `Views/` for nothing - and it locked out the bindable parts of a screen that
+  are plain `MonoBehaviour`s rather than UI Toolkit views. The null check is written out rather than
+  left as `view != null`, because on a type parameter that operator does not reach
+  `UnityEngine.Object`'s overload and the fake-null guard, which is the whole point of the method,
+  would have silently stopped working. Call sites still infer both type arguments.
+
+### Added
+
+- `ScreenRoot`, a concrete `ViewRoot` for a screen that scopes child views but has no view model of
+  its own. `ViewRoot` is abstract and `View<TViewModel>` demands a view model, so a GameObject that
+  exists purely to name a scope previously had nothing to put on it.
+
+### Tests
+
+- `Blind.Reactive.Tests` splits out of `Blind.UiMvvm.Tests` alongside the runtime split, carrying
+  `ReactivePropertyTests`, `ReactivePropertyIntegrationTests` and `SubscriptionTests`.
+  `ViewLifecycleTests` stays put - it is a `View<T>` test that merely uses a `ReactiveProperty`.
+- New coverage for `ViewBinding.TryBind`, which had none, including the destroyed-component case the
+  constraint change turns on, and for a `View<T>` resolving through a `ScreenRoot`.
+
 ## 0.4.0
 
 Everything a consuming project was writing by hand around this package, plus four defects.

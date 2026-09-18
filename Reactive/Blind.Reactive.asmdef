@@ -1,10 +1,7 @@
 {
-  "name": "Blind.UiMvvm",
-  "rootNamespace": "Blind.UiMvvm",
-  "references": [
-    "Blind.Reactive",
-    "UniTask"
-  ],
+  "name": "Blind.Reactive",
+  "rootNamespace": "Blind.Reactive",
+  "references": [],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

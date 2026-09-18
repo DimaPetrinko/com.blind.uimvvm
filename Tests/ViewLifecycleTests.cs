@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Blind.UiMvvm.ReactiveProperties.Implementation;
+using Blind.Reactive.Implementation;
 using Blind.UiMvvm.Views;
 using NUnit.Framework;
 using Unity.Properties;

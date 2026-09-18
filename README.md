@@ -8,7 +8,8 @@ No DI container required. Depends on built-in engine modules plus
 
 ## Install
 
-**Install [UniTask](https://github.com/Cysharp/UniTask) first.** This package's asmdef references it,
+**Install [UniTask](https://github.com/Cysharp/UniTask) first.** `Blind.UiMvvm` references it
+(`Blind.Reactive` does not),
 and UPM cannot declare it as a dependency because UPM only resolves dependencies from registries,
 never from git URLs. Without UniTask present you will get a compile error rather than a resolve error.
 
@@ -30,22 +31,27 @@ Requires Unity 6000.0 or newer — `VisualElement.dataSource` runtime binding do
 
 ## What is in the box
 
-| Type | Role |
-|---|---|
-| `IReactiveProperty<T>` / `IReadOnlyReactiveProperty<T>` / `ReactiveProperty<T>` | Change-notifying values. `Changed` only fires when the value actually differs. Handler exceptions are logged, not propagated. Both hot paths are allocation-free. |
-| `.Subscribe(handler, fireImmediately)` / `CompositeDisposable` | Subscribe, prime and unsubscribe as one thing instead of three. |
-| `IBindable<TVm>` | A view accepts a view model. |
-| `ViewRoot` | `MonoBehaviour` base holding the serialized `Root Name` and resolving that element **relative to the nearest ancestor `ViewRoot`**, or the `UIDocument` root when there is none. |
-| `View<TViewModel>` | `ViewRoot` subclass that assigns the resolved root's `dataSource` and undoes, on destroy, everything wired through its helpers. |
-| `IViewBinder` / `ViewBinding.TryBind` | One screen's "bind my views" step, called by whatever opens the screen. |
-| `IScreenOpener<TScreen>` / `IScreenService<TScreen>` / `ScreenService<TScreen>` | Awaitable screen navigation keyed by **your** enum. Each screen registers an opener; callers only name a screen. |
-| `ScreenOpener<TScreen, TInstance>` + `ModalScreenOpener` / `PersistentScreenOpener` / `ScreenCover` | The opener skeleton, minus your container. Create, bind, destroy or cover. |
-| `StubScreenOpener<TScreen>` | Placeholder opener for a screen that does not exist yet. |
-| `IUssTransition` / `UssTransition` | Awaitable USS transitions that complete exactly once and never throw. |
-| `SafeArea` | A `[UxmlElement]` that insets itself from `Screen.safeArea`. UI Toolkit has none of its own. |
-| `UiToolkitConverters` | The `bool` → `StyleEnum<DisplayStyle>` converter every visibility binding needs. |
-| `Blind.UiMvvm.Editor` | A `ViewRoot` inspector that turns `Root Name` into a list of the names actually in the UXML. |
-| `Blind.UiMvvm.TestSupport` | `UxmlAudit`, `PrefabAudit`, `ViewAudit` - the UXML-to-C# links the compiler cannot see. |
+Two runtime assemblies. **`Blind.Reactive` has no UI dependency and can be referenced on its own** -
+domain code that only needs change-notifying values never compiles against UI Toolkit or UniTask.
+`Blind.UiMvvm` references it and adds everything else.
+
+| Type | Assembly | Role |
+|---|---|---|
+| `IReactiveProperty<T>` / `IReadOnlyReactiveProperty<T>` / `ReactiveProperty<T>` | `Blind.Reactive` | Change-notifying values. `Changed` only fires when the value actually differs. Handler exceptions are logged, not propagated. Both hot paths are allocation-free. |
+| `.Subscribe(handler, fireImmediately)` / `CompositeDisposable` | `Blind.Reactive` | Subscribe, prime and unsubscribe as one thing instead of three. |
+| `IBindable<TVm>` | `Blind.UiMvvm` | A view accepts a view model. |
+| `ViewRoot` | `Blind.UiMvvm` | `MonoBehaviour` base holding the serialized `Root Name` and resolving that element **relative to the nearest ancestor `ViewRoot`**, or the `UIDocument` root when there is none. |
+| `View<TViewModel>` | `Blind.UiMvvm` | `ViewRoot` subclass that assigns the resolved root's `dataSource` and undoes, on destroy, everything wired through its helpers. |
+| `ScreenRoot` | `Blind.UiMvvm` | A `ViewRoot` for a screen that scopes its child views but has no view model of its own. |
+| `IViewBinder` / `ViewBinding.TryBind` | `Blind.UiMvvm` | One screen's "bind my views" step, called by whatever opens the screen. |
+| `IScreenOpener<TScreen>` / `IScreenService<TScreen>` / `ScreenService<TScreen>` | `Blind.UiMvvm` | Awaitable screen navigation keyed by **your** enum. Each screen registers an opener; callers only name a screen. |
+| `ScreenOpener<TScreen, TInstance>` + `ModalScreenOpener` / `PersistentScreenOpener` / `ScreenCover` | `Blind.UiMvvm` | The opener skeleton, minus your container. Create, bind, destroy or cover. |
+| `StubScreenOpener<TScreen>` | `Blind.UiMvvm` | Placeholder opener for a screen that does not exist yet. |
+| `IUssTransition` / `UssTransition` | `Blind.UiMvvm` | Awaitable USS transitions that complete exactly once and never throw. |
+| `SafeArea` | `Blind.UiMvvm` | A `[UxmlElement]` that insets itself from `Screen.safeArea`. UI Toolkit has none of its own. |
+| `UiToolkitConverters` | `Blind.UiMvvm` | The `bool` → `StyleEnum<DisplayStyle>` converter every visibility binding needs. |
+| `Blind.UiMvvm.Editor` | - | A `ViewRoot` inspector that turns `Root Name` into a list of the names actually in the UXML. |
+| `Blind.UiMvvm.TestSupport` | - | `UxmlAudit`, `PrefabAudit`, `ViewAudit` - the UXML-to-C# links the compiler cannot see. |
 
 ## Building a panel
 
@@ -128,6 +134,9 @@ Requires Unity 6000.0 or newer — `VisualElement.dataSource` runtime binding do
       └─ SecondCounterView Root Name = SecondCounter
          └─ AdButtonView   Root Name = AdButton
    ```
+
+   A screen that scopes child views but has no view model of its own uses `ScreenRoot` in place of
+   the `ScreenView` above - `ViewRoot` is abstract and `View<TViewModel>` demands a view model.
 
    This is what lets several instances of one template each be bound: a name only has to be unique
    inside its parent's subtree, not across the whole document. Resolution recurses up by name rather

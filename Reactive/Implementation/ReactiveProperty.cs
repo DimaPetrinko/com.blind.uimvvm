@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Blind.UiMvvm.ReactiveProperties.Implementation
+namespace Blind.Reactive.Implementation
 {
 	/// <summary>
 	/// A change-notifying value. <see cref="Changed"/> fires only when the value actually differs, so a

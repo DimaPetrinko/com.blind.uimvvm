@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 
-namespace Blind.UiMvvm.ReactiveProperties
+namespace Blind.Reactive
 {
 	/// <summary>
 	/// Subscription helpers for <see cref="IReadOnlyReactiveProperty{T}"/>.

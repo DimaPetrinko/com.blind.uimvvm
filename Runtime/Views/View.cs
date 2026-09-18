@@ -1,9 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using Blind.Reactive;
+using Blind.Reactive.Disposables;
 using Blind.UiMvvm.Binding;
-using Blind.UiMvvm.Disposables;
-using Blind.UiMvvm.ReactiveProperties;
 using UnityEngine;
 using UnityEngine.UIElements;
 

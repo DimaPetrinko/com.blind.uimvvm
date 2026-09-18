@@ -216,6 +216,56 @@ namespace Blind.UiMvvm.Tests
 			Assert.That(exception!.Message, Does.Contain("SecondCounter"));
 		}
 
+		[Test]
+		public void Bind_ResolvesThroughAScreenRoot_WhichHasNoViewModelOfItsOwn()
+		{
+			var screen = CreateScreenRoot("Screen");
+			var view = AddChildView(screen, "FirstCounter");
+
+			view.Bind(new CounterViewModel());
+
+			Assert.That(screen.ResolveRoot().name, Is.EqualTo("Screen"));
+			Assert.That(view.Root, Is.SameAs(screen.ResolveRoot().Q("FirstCounter")));
+		}
+
+		[Test]
+		public void Bind_ThrowsUnderAScreenRoot_WhenTheNameExistsOnlyOutsideItsScope()
+		{
+			var screen = CreateScreenRoot("FirstCounter");
+			var view = AddChildView(screen, "SecondCounter");
+
+			var exception = Assert.Throws<MissingComponentException>(
+				() => view.Bind(new CounterViewModel()));
+
+			Assert.That(exception!.Message, Does.Contain("SecondCounter"));
+		}
+
+		private ScreenRoot CreateScreenRoot(string rootName)
+		{
+			var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(NestedFixturePath);
+			Assert.That(visualTree, Is.Not.Null, $"could not load fixture at {NestedFixturePath}");
+
+			mHost = new GameObject("UiHost");
+			var document = mHost.AddComponent<UIDocument>();
+			document.panelSettings = CreatePanelSettings();
+			document.visualTreeAsset = visualTree;
+
+			var screenHost = new GameObject("ScreenRoot");
+			screenHost.transform.SetParent(mHost.transform);
+			var screen = screenHost.AddComponent<ScreenRoot>();
+			SetRootName(screen, rootName);
+			return screen;
+		}
+
+		private static CounterView AddChildView(ViewRoot parent, string rootName)
+		{
+			var host = new GameObject($"{rootName}View");
+			host.transform.SetParent(parent.transform);
+			var view = host.AddComponent<CounterView>();
+			SetRootName(view, rootName);
+			return view;
+		}
+
 		private class BareView : View<CounterViewModel>
 		{
 			public VisualElement Root => mRoot;

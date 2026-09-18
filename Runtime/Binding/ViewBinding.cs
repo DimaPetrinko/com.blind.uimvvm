@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using Blind.UiMvvm.Views;
 using UnityEngine;
 
 namespace Blind.UiMvvm.Binding
@@ -16,15 +15,21 @@ namespace Blind.UiMvvm.Binding
 		///
 		/// An unassigned reference is a wiring mistake in a prefab, not a reason to take the rest of the
 		/// screen down with it - the other blocks still work, and the message says which one did not.
+		///
+		/// Constrained to <see cref="IBindable{TVm}"/> rather than to a view type, because that is all
+		/// the body needs and the bindable parts of a screen are not all UI Toolkit views.
 		/// </summary>
-		public static bool TryBind<TViewModel>(
-			View<TViewModel>? view,
+		public static bool TryBind<TView, TViewModel>(
+			TView? view,
 			TViewModel viewModel,
 			Action<string>? logError = null,
 			string? name = null)
+			where TView : class, IBindable<TViewModel>
 			where TViewModel : class
 		{
-			if (view != null)
+			// A destroyed or never-assigned UnityEngine.Object is not null by reference, and `!=` on a
+			// type parameter does not reach Unity's overload, so the check has to be written out.
+			if (view != null && (view is not UnityEngine.Object unityObject || unityObject != null))
 			{
 				view.Bind(viewModel);
 				return true;

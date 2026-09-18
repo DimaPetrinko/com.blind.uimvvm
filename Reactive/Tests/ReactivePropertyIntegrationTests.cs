@@ -1,11 +1,10 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using Blind.UiMvvm.ReactiveProperties;
-using Blind.UiMvvm.ReactiveProperties.Implementation;
+using Blind.Reactive.Implementation;
 using NUnit.Framework;
 
-namespace Blind.UiMvvm.Tests
+namespace Blind.Reactive.Tests
 {
 	public class ReactivePropertyIntegrationTests
 	{

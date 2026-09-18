@@ -1,5 +1,5 @@
 #nullable enable
-namespace Blind.UiMvvm.ReactiveProperties
+namespace Blind.Reactive
 {
 	public interface IReactiveProperty<T> : IReadOnlyReactiveProperty<T>
 	{
