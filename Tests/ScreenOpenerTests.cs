@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using Blind.UiMvvm.Binding;
 using Blind.UiMvvm.Navigation;
@@ -178,6 +179,58 @@ namespace Blind.UiMvvm.Tests
 			Assert.That(opener.Calls, Is.EqualTo(new[] { "create", "bind", "created", "enter", "exit", "destroy" }));
 		}
 
+		/// <summary>
+		/// The likeliest failure in a project: the screen's scope cannot resolve its binder. Left alive,
+		/// the half-built modal would sit on screen unbound and refuse every later open as already open.
+		/// </summary>
+		[Test]
+		public void Open_WhenBindingThrows_DestroysTheModal_AndRethrows()
+		{
+			var opener = new FakeModal(this) { BinderThrows = true };
+
+			Assert.Throws<InvalidOperationException>(() => Run(opener.Open()));
+			Assert.That(opener.DestroyCount, Is.EqualTo(1));
+
+			opener.BinderThrows = false;
+
+			Assert.That(Run(opener.Open()), Is.True, "the failed screen still counted as open");
+		}
+
+		[Test]
+		public void Open_WhenEnterThrows_DestroysTheModal_AndRethrows()
+		{
+			var opener = new FakeModal(this) { EnterThrows = true };
+
+			Assert.Throws<InvalidOperationException>(() => Run(opener.Open()));
+			Assert.That(opener.DestroyCount, Is.EqualTo(1));
+
+			opener.EnterThrows = false;
+
+			Assert.That(Run(opener.Open()), Is.True, "the failed screen still counted as open");
+		}
+
+		[Test]
+		public void Open_WhenEnterThrows_HidesThePersistentScreenAgain()
+		{
+			var opener = new FakePersistent(this);
+			Run(opener.Open());
+			Run(opener.Close());
+			opener.EnterThrows = true;
+
+			Assert.Throws<InvalidOperationException>(() => Run(opener.Open()));
+			Assert.That(opener.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.None));
+		}
+
+		[Test]
+		public void Close_WhenExitThrows_StillDestroysTheModal_AndRethrows()
+		{
+			var opener = new FakeModal(this) { ExitThrows = true };
+			Run(opener.Open());
+
+			Assert.Throws<InvalidOperationException>(() => Run(opener.Close()));
+			Assert.That(opener.DestroyCount, Is.EqualTo(1));
+		}
+
 		[Test]
 		public void ScreenCover_Display_CollapsesAndRestores()
 		{
@@ -266,7 +319,10 @@ namespace Blind.UiMvvm.Tests
 			public List<string> Calls { get; } = new();
 			public bool PrepareResult { get; set; } = true;
 			public bool BinderIsMissing { get; set; }
+			public bool BinderThrows { get; set; }
 			public bool Animates { get; set; }
+			public bool EnterThrows { get; set; }
+			public bool ExitThrows { get; set; }
 			public int CreateCount { get; private set; }
 			public int DestroyCount { get; private set; }
 
@@ -279,13 +335,21 @@ namespace Blind.UiMvvm.Tests
 				return new Screen();
 			}
 
-			protected override IViewBinder? ResolveBinder(Screen instance) =>
-				BinderIsMissing ? null : new RecordingBinder(Calls);
+			protected override IViewBinder? ResolveBinder(Screen instance)
+			{
+				if (BinderThrows)
+					throw new InvalidOperationException("The binder could not be resolved");
+
+				return BinderIsMissing ? null : new RecordingBinder(Calls);
+			}
 
 			protected override void OnScreenCreated(Screen instance) => Calls.Add("created");
 
 			protected override UniTask PlayEnter()
 			{
+				if (EnterThrows)
+					return UniTask.FromException(new InvalidOperationException("The enter animation failed"));
+
 				if (Animates)
 					Calls.Add("enter");
 
@@ -294,6 +358,9 @@ namespace Blind.UiMvvm.Tests
 
 			protected override UniTask PlayExit()
 			{
+				if (ExitThrows)
+					return UniTask.FromException(new InvalidOperationException("The exit animation failed"));
+
 				if (Animates)
 					Calls.Add("exit");
 
@@ -317,12 +384,18 @@ namespace Blind.UiMvvm.Tests
 			}
 
 			public bool CreationFails { get; set; }
+			public bool EnterThrows { get; set; }
 			public int CreateCount { get; private set; }
 			public int BindCount { get; private set; }
 
 			public VisualElement? CurrentRoot => Root;
 
 			public void ReplaceRoot() => mScreen!.Root = new VisualElement();
+
+			protected override UniTask PlayEnter() =>
+				EnterThrows
+					? UniTask.FromException(new InvalidOperationException("The enter animation failed"))
+					: UniTask.CompletedTask;
 
 			protected override Screen? CreateScreen()
 			{

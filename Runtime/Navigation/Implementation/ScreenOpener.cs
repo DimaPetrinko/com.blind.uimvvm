@@ -21,6 +21,13 @@ namespace Blind.UiMvvm.Navigation.Implementation
 	/// before anything can yield, or the screen renders one frame of the placeholder values authored
 	/// into its UXML. A screen that must load something awaits in <see cref="Prepare"/> first, then
 	/// creates and binds atomically.
+	///
+	/// <b>A transition that throws leaves no half-open screen behind.</b> An open that fails anywhere
+	/// after <see cref="Prepare"/> - creating, binding, <see cref="OnPushed"/> or <see cref="PlayEnter"/> -
+	/// is popped before the exception goes on, and a close pops even when <see cref="PlayExit"/> throws.
+	/// A modal is destroyed and a persistent screen hidden again, so the failure cannot strand a visible
+	/// screen nothing will close, or leave a modal that refuses every later open as already open. The
+	/// exception still reaches the caller, which decides what the failure means for its flow.
 	/// </summary>
 	public abstract class ScreenOpener<TScreen, TInstance> : IScreenOpener<TScreen>
 		where TScreen : struct, Enum
@@ -79,12 +86,20 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			if (!await Prepare())
 				return false;
 
-			if (Instance == null && !Create())
-				return false;
+			try
+			{
+				if (Instance == null && !Create())
+					return false;
 
-			OnPushed();
-			await PlayEnter();
-			return true;
+				OnPushed();
+				await PlayEnter();
+				return true;
+			}
+			catch
+			{
+				OnPopped();
+				throw;
+			}
 		}
 
 		public async UniTask Close()
@@ -92,8 +107,14 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			if (Instance == null)
 				return;
 
-			await PlayExit();
-			OnPopped();
+			try
+			{
+				await PlayExit();
+			}
+			finally
+			{
+				OnPopped();
+			}
 		}
 
 		public abstract void SetCovered(bool covered);

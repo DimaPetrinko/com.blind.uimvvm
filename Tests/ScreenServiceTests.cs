@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
@@ -29,9 +30,14 @@ namespace Blind.UiMvvm.Tests
 			public int CloseCount { get; private set; }
 			public bool IsCovered { get; private set; }
 			public bool RefusesToOpen { get; set; }
+			public bool ThrowsOnOpen { get; set; }
+			public bool ThrowsOnClose { get; set; }
 
 			public UniTask<bool> Open()
 			{
+				if (ThrowsOnOpen)
+					return UniTask.FromException<bool>(new InvalidOperationException("The screen failed to open"));
+
 				if (RefusesToOpen)
 					return UniTask.FromResult(false);
 
@@ -42,7 +48,10 @@ namespace Blind.UiMvvm.Tests
 			public UniTask Close()
 			{
 				CloseCount++;
-				return UniTask.CompletedTask;
+
+				return ThrowsOnClose
+					? UniTask.FromException(new InvalidOperationException("The screen failed to close"))
+					: UniTask.CompletedTask;
 			}
 
 			public void SetCovered(bool covered) => IsCovered = covered;
@@ -192,6 +201,45 @@ namespace Blind.UiMvvm.Tests
 
 			Assert.That(hub.IsCovered, Is.False, "the hub was hidden behind a screen that never opened");
 			Assert.That(service.Current, Is.EqualTo(TestScreen.Hub));
+		}
+
+		[Test]
+		public void AnOpenerThatThrows_LeavesTheStackUntouched_AndRethrows()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var shop = new RecordingOpener(TestScreen.Shop) { ThrowsOnOpen = true };
+			var service = Create(hub, shop);
+			Run(service.Open(TestScreen.Hub));
+
+			Assert.Throws<InvalidOperationException>(() => Run(service.Open(TestScreen.Shop)));
+			Assert.That(hub.IsCovered, Is.False, "the hub was hidden behind a screen that never opened");
+			Assert.That(service.Current, Is.EqualTo(TestScreen.Hub));
+
+			shop.ThrowsOnOpen = false;
+
+			Assert.That(Run(service.Open(TestScreen.Shop)), Is.True, "the failed transition was still in flight");
+		}
+
+		/// <summary>
+		/// The opener tears a screen down even when its close throws, so the stack has to let go of it
+		/// too. Kept, it would name a screen that is gone and refuse every later open of it.
+		/// </summary>
+		[Test]
+		public void AnOpenerThatThrowsOnClose_IsStillPopped_AndRethrows()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var modal = new RecordingOpener(TestScreen.Modal) { ThrowsOnClose = true };
+			var service = Create(hub, modal);
+			Run(service.Open(TestScreen.Hub));
+			Run(service.Open(TestScreen.Modal));
+
+			Assert.Throws<InvalidOperationException>(() => Run(service.Close()));
+			Assert.That(service.Current, Is.EqualTo(TestScreen.Hub));
+			Assert.That(hub.IsCovered, Is.False);
+
+			modal.ThrowsOnClose = false;
+
+			Assert.That(Run(service.Open(TestScreen.Modal)), Is.True, "the failed screen was still on the stack");
 		}
 
 		[Test]

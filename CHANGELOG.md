@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.1
+
+A screen transition that throws no longer leaves a half-open screen behind.
+
+### Fixed
+
+- **An open that threw left its screen alive.** A modal whose binding or enter animation threw
+  stayed on screen unbound, off the stack, and refused every later open as already open.
+  `ScreenOpener.Open` now pops whatever it built - a modal is destroyed, a persistent screen hidden
+  again - before the exception goes on.
+- **A close that threw left the screen on the stack.** `ScreenOpener.Close` pops even when the exit
+  animation throws, and `ScreenService.Close` pops the stack even when the opener's close throws, so
+  `Current` never names a screen that is gone.
+
+Neither swallows the exception: it still reaches the caller, which decides what the failure means
+for its flow.
+
+### Tests
+
+- `ScreenOpenerTests` cover a throwing binder, enter and exit; `ScreenServiceTests` cover an opener
+  that throws on open and on close, including that the next transition still runs.
+
 ## 0.5.0
 
 Reactive properties leave the UI assembly, so domain code can use them without compiling against

@@ -19,6 +19,10 @@ namespace Blind.UiMvvm.Navigation.Implementation
 	/// a time: a request that arrives while another is still in flight is refused rather than queued,
 	/// because interleaving two transitions would push onto a stack whose top is still moving.
 	///
+	/// A transition that throws is not swallowed. The stack is left holding only screens that are
+	/// actually up - an open that throws is never pushed, a close that throws is still popped - and
+	/// the exception goes on to the caller.
+	///
 	/// Logging goes through delegates rather than a logging framework, so a project can route these
 	/// messages into whatever logger it uses.
 	/// </summary>
@@ -135,10 +139,17 @@ namespace Blind.UiMvvm.Navigation.Implementation
 
 				// Uncovered before the close is awaited, not after, so an exit animation plays over the
 				// screen it is revealing rather than over a hidden one. Popped only once the close has
-				// finished, so Current names the screen that is actually on top the whole way through.
+				// finished, so Current names the screen that is actually on top the whole way through -
+				// or once it has thrown, because the opener tears the screen down either way.
 				mOpeners[revealing].SetCovered(false);
-				await mOpeners[closing].Close();
-				mStack.RemoveAt(mStack.Count - 1);
+				try
+				{
+					await mOpeners[closing].Close();
+				}
+				finally
+				{
+					mStack.RemoveAt(mStack.Count - 1);
+				}
 
 				return true;
 			}
