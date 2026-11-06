@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.6.0
+
+Screens can be given data: opened with it, or handed it while already open.
+
+### Added
+
+- **`IScreenService.Open<TArgs>(screen, args)`** opens a screen with data. The service passes the
+  args to the opener, and `ScreenOpener` hands them to the new `CreateScreen(object args)` overload,
+  where a project typically registers them in the screen's own scope.
+- **`IScreenService.Deliver<TArgs>(screen, args)`** hands data to a screen that is already open,
+  anywhere in the stack. It is not a transition: nothing is pushed, popped or covered. It returns
+  false, with a warning, when the screen is not open or does not take that type.
+- **`IScreenArgsReceiver<TArgs>`**, the contract an open screen implements to take delivered args.
+  `ScreenOpener.DeliverTo` is where an opener finds it and passes the args on.
+- Reopening a persistent screen with args delivers them to the existing instance.
+
+### Changed - breaking
+
+- `IScreenOpener.Open()` is now `Open(object? args = null)`, and openers implement
+  `bool Deliver(object args)`. Openers deriving from `ScreenOpener` or `StubScreenOpener` need no
+  change; a hand-written `IScreenOpener` adds the parameter and `Deliver`.
+- `ScreenOpener.CreateScreen(object args)` refuses by default and logs an error: args a screen never
+  asked for are a caller's mistake, not data to drop.
+
+### Tests
+
+- `ScreenServiceTests` and `ScreenOpenerTests` cover opening with args, delivery to an open or
+  covered screen, and the refusals.
+
 ## 0.5.1
 
 A screen transition that throws no longer leaves a half-open screen behind.

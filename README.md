@@ -232,6 +232,38 @@ await service.Open(ScreenId.Shop);
 happened: an opener can decline, a screen can already be open, and a request arriving mid-transition
 is refused. `IsOpen(screen)` reports anything in the stack, not just the top.
 
+### Screen args
+
+A screen that needs data is given it through navigation, not through a side channel:
+
+```csharp
+await service.Open(ScreenId.Shop, new ShopArgs(focusOfferId));   // a new screen
+service.Deliver(ScreenId.Shop, new ShopArgs(focusOfferId));      // one already open
+```
+
+- **Open with args** passes them to the opener's `CreateScreen(object args)`. A screen that takes
+  args overrides it, typically registering them in the screen's own scope so its view models inject
+  them. The default refuses and logs: args a screen never asked for are a caller's mistake.
+- **Deliver** reaches a screen anywhere in the stack, covered or not, and is not a transition. The
+  opener's `DeliverTo(instance, args)` finds the screen's `IScreenArgsReceiver<TArgs>` and passes them
+  on. It returns false, with a warning, when the screen is not open or does not take that type.
+- Reopening a persistent screen with args delivers them to the existing instance.
+
+```csharp
+protected override ShopScreen? CreateScreen() => Create(ShopArgs.None);
+protected override ShopScreen? CreateScreen(object args) =>
+    args is ShopArgs shopArgs ? Create(shopArgs) : base.CreateScreen(args);
+
+protected override bool DeliverTo(ShopScreen screen, object args)
+{
+    if (args is not ShopArgs shopArgs)
+        return false;
+
+    screen.Container.Resolve<IScreenArgsReceiver<ShopArgs>>().Receive(shopArgs);
+    return true;
+}
+```
+
 ### Writing an opener
 
 `ScreenOpener<TScreen, TInstance>` owns the shared skeleton - is there a live instance, create it,

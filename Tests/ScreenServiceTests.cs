@@ -32,9 +32,14 @@ namespace Blind.UiMvvm.Tests
 			public bool RefusesToOpen { get; set; }
 			public bool ThrowsOnOpen { get; set; }
 			public bool ThrowsOnClose { get; set; }
+			public bool AcceptsDelivery { get; set; } = true;
+			public object LastOpenArgs { get; private set; }
+			public List<object> Delivered { get; } = new();
 
-			public UniTask<bool> Open()
+			public UniTask<bool> Open(object args = null)
 			{
+				LastOpenArgs = args;
+
 				if (ThrowsOnOpen)
 					return UniTask.FromException<bool>(new InvalidOperationException("The screen failed to open"));
 
@@ -43,6 +48,15 @@ namespace Blind.UiMvvm.Tests
 
 				OpenCount++;
 				return UniTask.FromResult(true);
+			}
+
+			public bool Deliver(object args)
+			{
+				if (!AcceptsDelivery)
+					return false;
+
+				Delivered.Add(args);
+				return true;
 			}
 
 			public UniTask Close()
@@ -66,11 +80,13 @@ namespace Blind.UiMvvm.Tests
 			public TestScreen Screen { get; }
 			public int OpenCount { get; private set; }
 
-			public UniTask<bool> Open()
+			public UniTask<bool> Open(object args = null)
 			{
 				OpenCount++;
 				return _gate.Task;
 			}
+
+			public bool Deliver(object args) => false;
 
 			public void Release(bool opened) => _gate.TrySetResult(opened);
 
@@ -91,7 +107,9 @@ namespace Blind.UiMvvm.Tests
 			public TestScreen Screen { get; }
 			public bool IsCovered { get; private set; }
 
-			public UniTask<bool> Open() => UniTask.FromResult(true);
+			public UniTask<bool> Open(object args = null) => UniTask.FromResult(true);
+
+			public bool Deliver(object args) => false;
 
 			public UniTask Close() => _gate.Task;
 
@@ -362,6 +380,106 @@ namespace Blind.UiMvvm.Tests
 		/// for two slots at once, and the second close would tear down a screen still shown by the
 		/// first.
 		/// </summary>
+		private sealed class ShopArgs
+		{
+		}
+
+		private sealed class OtherArgs
+		{
+		}
+
+		[Test]
+		public void Open_WithArgs_HandsThemToTheOpener()
+		{
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var service = Create(shop);
+			var args = new ShopArgs();
+
+			var opened = Run(service.Open(TestScreen.Shop, args));
+
+			Assert.That(opened, Is.True);
+			Assert.That(shop.LastOpenArgs, Is.SameAs(args));
+		}
+
+		[Test]
+		public void Open_WithoutArgs_HandsTheOpenerNull()
+		{
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var service = Create(shop);
+
+			Run(service.Open(TestScreen.Shop));
+
+			Assert.That(shop.LastOpenArgs, Is.Null);
+		}
+
+		[Test]
+		public void Open_WithNullArgs_Throws()
+		{
+			var service = Create(new RecordingOpener(TestScreen.Shop));
+
+			Assert.Throws<ArgumentNullException>(() => service.Open<ShopArgs>(TestScreen.Shop, null));
+		}
+
+		[Test]
+		public void Deliver_ToAScreenLowerInTheStack_ReachesItsOpener_WithoutATransition()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var modal = new RecordingOpener(TestScreen.Modal);
+			var service = Create(hub, shop, modal);
+			Run(service.Open(TestScreen.Hub));
+			Run(service.Open(TestScreen.Shop));
+			Run(service.Open(TestScreen.Modal));
+			var args = new ShopArgs();
+
+			var delivered = service.Deliver(TestScreen.Shop, args);
+
+			Assert.That(delivered, Is.True);
+			Assert.That(shop.Delivered, Is.EqualTo(new object[] { args }));
+			Assert.That(shop.OpenCount, Is.EqualTo(1));
+			Assert.That(service.Current, Is.EqualTo(TestScreen.Modal));
+			Assert.That(shop.IsCovered, Is.True);
+		}
+
+		[Test]
+		public void Deliver_ToAScreenThatIsNotOpen_IsRefusedWithAWarning()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var service = Create(hub, shop);
+			Run(service.Open(TestScreen.Hub));
+
+			var delivered = service.Deliver(TestScreen.Shop, new ShopArgs());
+
+			Assert.That(delivered, Is.False);
+			Assert.That(shop.Delivered, Is.Empty);
+			Assert.That(_warnings.Any(warning => warning.Contains("not open")), Is.True);
+		}
+
+		[Test]
+		public void Deliver_ThatTheOpenerRefuses_ReturnsFalseWithAWarning()
+		{
+			var shop = new RecordingOpener(TestScreen.Shop) { AcceptsDelivery = false };
+			var service = Create(shop);
+			Run(service.Open(TestScreen.Shop));
+
+			var delivered = service.Deliver(TestScreen.Shop, new OtherArgs());
+
+			Assert.That(delivered, Is.False);
+			Assert.That(_warnings.Any(warning => warning.Contains("does not take OtherArgs")), Is.True);
+		}
+
+		[Test]
+		public void Deliver_ToTheDefaultTestScreen_IsAnError()
+		{
+			var service = Create(new RecordingOpener(TestScreen.Hub));
+
+			var delivered = service.Deliver(default(TestScreen), new ShopArgs());
+
+			Assert.That(delivered, Is.False);
+			Assert.That(_errors, Has.Count.EqualTo(1));
+		}
+
 		[Test]
 		public void OpeningAScreenAlreadyLowerInTheStack_IsRefused()
 		{

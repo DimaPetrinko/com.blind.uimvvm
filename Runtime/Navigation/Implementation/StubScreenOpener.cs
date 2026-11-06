@@ -21,11 +21,13 @@ namespace Blind.UiMvvm.Navigation.Implementation
 
 		public TScreen Screen { get; }
 
-		public UniTask<bool> Open()
+		public UniTask<bool> Open(object? args = null)
 		{
 			mLog($"{Screen} screen is not implemented yet");
 			return UniTask.FromResult(false);
 		}
+
+		public bool Deliver(object args) => false;
 
 		public UniTask Close() => UniTask.CompletedTask;
 

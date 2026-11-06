@@ -291,6 +291,67 @@ namespace Blind.UiMvvm.Tests
 			Assert.That(service.Current, Is.EqualTo(TestScreen.Hub));
 		}
 
+		[Test]
+		public void Open_WithArgs_CreatesTheScreenWithThem()
+		{
+			var opener = new FakeModal(this) { TakesArgs = true };
+			var args = new object();
+
+			var opened = Run(opener.Open(args));
+
+			Assert.That(opened, Is.True);
+			Assert.That(opener.CreatedWith, Is.SameAs(args));
+			Assert.That(opener.Calls, Is.EqualTo(new[] { "create", "bind", "created" }));
+		}
+
+		[Test]
+		public void Open_WithArgs_IsRefused_ByAnOpenerThatTakesNone()
+		{
+			var opener = new FakeModal(this);
+
+			var opened = Run(opener.Open(new object()));
+
+			Assert.That(opened, Is.False);
+			Assert.That(opener.CreateCount, Is.Zero);
+			Assert.That(mErrors.Exists(error => error.Contains("does not take args")), Is.True);
+		}
+
+		[Test]
+		public void Deliver_ReachesTheLiveScreen()
+		{
+			var opener = new FakeModal(this) { TakesArgs = true };
+			Run(opener.Open());
+			var args = new object();
+
+			var delivered = opener.Deliver(args);
+
+			Assert.That(delivered, Is.True);
+			Assert.That(opener.Delivered, Is.EqualTo(new[] { args }));
+		}
+
+		[Test]
+		public void Deliver_WithNoLiveScreen_IsRefused()
+		{
+			var opener = new FakeModal(this) { TakesArgs = true };
+
+			Assert.That(opener.Deliver(new object()), Is.False);
+			Assert.That(opener.Delivered, Is.Empty);
+		}
+
+		[Test]
+		public void Open_WithArgs_DeliversThemToAPersistentScreensExistingInstance()
+		{
+			var opener = new FakePersistent(this);
+			Run(opener.Open());
+			opener.SetCovered(true);
+			var args = new object();
+
+			Run(opener.Open(args));
+
+			Assert.That(opener.CreateCount, Is.EqualTo(1));
+			Assert.That(opener.Delivered, Is.EqualTo(new[] { args }));
+		}
+
 		private static bool Run(UniTask<bool> task) => task.GetAwaiter().GetResult();
 
 		private static void Run(UniTask task) => task.GetAwaiter().GetResult();
@@ -325,6 +386,9 @@ namespace Blind.UiMvvm.Tests
 			public bool ExitThrows { get; set; }
 			public int CreateCount { get; private set; }
 			public int DestroyCount { get; private set; }
+			public bool TakesArgs { get; set; }
+			public object? CreatedWith { get; private set; }
+			public List<object> Delivered { get; } = new();
 
 			protected override UniTask<bool> Prepare() => UniTask.FromResult(PrepareResult);
 
@@ -333,6 +397,24 @@ namespace Blind.UiMvvm.Tests
 				CreateCount++;
 				Calls.Add("create");
 				return new Screen();
+			}
+
+			protected override Screen? CreateScreen(object args)
+			{
+				if (!TakesArgs)
+					return base.CreateScreen(args);
+
+				CreatedWith = args;
+				return CreateScreen();
+			}
+
+			protected override bool DeliverTo(Screen instance, object args)
+			{
+				if (!TakesArgs)
+					return false;
+
+				Delivered.Add(args);
+				return true;
 			}
 
 			protected override IViewBinder? ResolveBinder(Screen instance)
@@ -414,6 +496,16 @@ namespace Blind.UiMvvm.Tests
 			}
 
 			protected override VisualElement ResolveRoot(Screen instance) => instance.Root;
+
+			public List<object> Delivered { get; } = new();
+
+			protected override Screen? CreateScreen(object args) => CreateScreen();
+
+			protected override bool DeliverTo(Screen instance, object args)
+			{
+				Delivered.Add(args);
+				return true;
+			}
 		}
 	}
 }

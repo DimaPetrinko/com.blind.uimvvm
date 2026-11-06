@@ -26,8 +26,13 @@ namespace Blind.UiMvvm.Navigation
 		/// Shows the screen. Returns false when it declined to open - a stub, or a screen whose
 		/// preconditions are not met - and the service then leaves the stack untouched, so nothing
 		/// ends up hidden behind a screen that never appeared.
+		///
+		/// <paramref name="args"/> is the data the caller opened the screen with, or null for none.
 		/// </summary>
-		UniTask<bool> Open();
+		UniTask<bool> Open(object? args = null);
+
+		/// <summary>Hands data to the live screen. False when there is none or it does not take that type.</summary>
+		bool Deliver(object args);
 
 		UniTask Close();
 

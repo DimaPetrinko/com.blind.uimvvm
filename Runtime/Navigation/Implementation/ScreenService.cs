@@ -63,7 +63,41 @@ namespace Blind.UiMvvm.Navigation.Implementation
 
 		public bool IsOpen(TScreen screen) => mStack.Contains(screen);
 
-		public async UniTask<bool> Open(TScreen screen)
+		public UniTask<bool> Open(TScreen screen) => OpenWith(screen, null);
+
+		public UniTask<bool> Open<TArgs>(TScreen screen, TArgs args) where TArgs : class
+		{
+			if (args == null)
+				throw new ArgumentNullException(nameof(args), $"Open({screen}) with args needs args; use Open({screen}) for none");
+
+			return OpenWith(screen, args);
+		}
+
+		public bool Deliver<TArgs>(TScreen screen, TArgs args) where TArgs : class
+		{
+			if (args == null)
+				throw new ArgumentNullException(nameof(args));
+
+			if (IsUnset(screen))
+			{
+				mLogError($"Deliver was called with the default {typeof(TScreen).Name}, which does not name a screen");
+				return false;
+			}
+
+			if (!IsOpen(screen) || !mOpeners.TryGetValue(screen, out var opener))
+			{
+				mLogWarning($"Cannot deliver {typeof(TArgs).Name} to {screen}: it is not open");
+				return false;
+			}
+
+			if (opener.Deliver(args))
+				return true;
+
+			mLogWarning($"{screen} does not take {typeof(TArgs).Name}");
+			return false;
+		}
+
+		private async UniTask<bool> OpenWith(TScreen screen, object? args)
 		{
 			if (IsUnset(screen))
 			{
@@ -96,7 +130,7 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			mIsTransitioning = true;
 			try
 			{
-				if (!await opener.Open())
+				if (!await opener.Open(args))
 					return false;
 
 				if (mStack.Count > 0)

@@ -73,7 +73,7 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			}
 		}
 
-		public async UniTask<bool> Open()
+		public async UniTask<bool> Open(object? args = null)
 		{
 			var instance = Instance;
 
@@ -88,8 +88,16 @@ namespace Blind.UiMvvm.Navigation.Implementation
 
 			try
 			{
-				if (Instance == null && !Create())
-					return false;
+				var existing = Instance;
+				if (existing == null)
+				{
+					if (!Create(args))
+						return false;
+				}
+				else if (args != null && !DeliverTo(existing, args))
+				{
+					mLogWarning($"The {Screen} screen does not take {args.GetType().Name}; reopening it without them");
+				}
 
 				OnPushed();
 				await PlayEnter();
@@ -117,10 +125,33 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			}
 		}
 
+		public bool Deliver(object args)
+		{
+			var instance = Instance;
+			return instance != null && DeliverTo(instance, args);
+		}
+
 		public abstract void SetCovered(bool covered);
 
 		/// <summary>Instantiates the screen. Return null to decline; the base logs that as a fault.</summary>
 		protected abstract TInstance? CreateScreen();
+
+		/// <summary>
+		/// Instantiates the screen with the data it was opened with. A screen that takes args overrides
+		/// this and hands them to the screen, typically by registering them in the screen's own scope.
+		/// The default refuses: args the screen never asked for are a caller's mistake, not data to drop.
+		/// </summary>
+		protected virtual TInstance? CreateScreen(object args)
+		{
+			mLogError($"{GetType().Name} does not take args, but {Screen} was opened with {args.GetType().Name}");
+			return null;
+		}
+
+		/// <summary>
+		/// Hands data to the live screen, for <see cref="IScreenService{TScreen}.Deliver{TArgs}"/> and for
+		/// reopening a persistent screen with args. Return false when the screen does not take them.
+		/// </summary>
+		protected virtual bool DeliverTo(TInstance instance, object args) => false;
 
 		/// <summary>The screen's own binder, resolved from whatever scope the screen brought with it.</summary>
 		protected abstract IViewBinder? ResolveBinder(TInstance instance);
@@ -168,9 +199,9 @@ namespace Blind.UiMvvm.Navigation.Implementation
 
 		protected void LogError(string message) => mLogError(message);
 
-		private bool Create()
+		private bool Create(object? args)
 		{
-			var created = CreateScreen();
+			var created = args == null ? CreateScreen() : CreateScreen(args);
 			if (created == null)
 			{
 				mLogError($"{GetType().Name} could not create the {Screen} screen");
