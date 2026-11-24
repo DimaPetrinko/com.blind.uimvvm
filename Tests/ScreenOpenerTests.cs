@@ -142,6 +142,43 @@ namespace Blind.UiMvvm.Tests
 		}
 
 		[Test]
+		public void SetCovered_HidesAModal_ThroughItsCover()
+		{
+			var opener = new FakeModal(this) { HasRoot = true };
+			Run(opener.Open());
+
+			opener.SetCovered(true);
+			Assert.That(opener.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.None));
+
+			opener.SetCovered(false);
+			Assert.That(opener.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+		}
+
+		[Test]
+		public void SetCovered_AppliesTheModalsOwnCover()
+		{
+			var opener = new FakeModal(this, cover: ScreenCover.UssClass("hidden")) { HasRoot = true };
+			Run(opener.Open());
+
+			opener.SetCovered(true);
+
+			Assert.That(opener.CurrentRoot!.ClassListContains("hidden"), Is.True);
+			Assert.That(opener.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+		}
+
+		[Test]
+		public void SetCovered_OnALiveModalWithNoRoot_Warns()
+		{
+			var opener = new FakeModal(this);
+			Run(opener.Open());
+
+			opener.SetCovered(true);
+
+			Assert.That(mWarnings, Has.Count.EqualTo(1));
+			Assert.That(mWarnings[0], Does.Contain("cannot be hidden"));
+		}
+
+		[Test]
 		public void SetCovered_BeforeAnyOpen_DoesNotThrow()
 		{
 			var opener = new FakePersistent(this);
@@ -292,6 +329,46 @@ namespace Blind.UiMvvm.Tests
 		}
 
 		[Test]
+		public void AServiceOpeningAModalOverAModal_HidesTheOneBeneath_UntilItCloses()
+		{
+			var hub = new FakePersistent(this, TestScreen.Hub);
+			var weapon = new FakeModal(this, TestScreen.Modal) { HasRoot = true };
+			var shop = new FakeModal(this, TestScreen.Shop) { HasRoot = true };
+			var service = new ScreenService<TestScreen>(
+				new IScreenOpener<TestScreen>[] { hub, weapon, shop }, mWarnings.Add, mErrors.Add);
+			Run(service.Open(TestScreen.Hub));
+			Run(service.Open(TestScreen.Modal));
+
+			Run(service.Open(TestScreen.Shop));
+
+			Assert.That(weapon.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.None));
+
+			Run(service.Close());
+
+			Assert.That(weapon.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+			Assert.That(hub.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.None));
+		}
+
+		[Test]
+		public void AServiceOpeningAnOverlayModal_LeavesTheHubShowing()
+		{
+			var hub = new FakePersistent(this, TestScreen.Hub);
+			var popup = new FakeModal(this) { Opening = ScreenOpening.Overlay, HasRoot = true };
+			var service = new ScreenService<TestScreen>(
+				new IScreenOpener<TestScreen>[] { hub, popup }, mWarnings.Add, mErrors.Add);
+			Run(service.Open(TestScreen.Hub));
+
+			Run(service.Open(TestScreen.Modal));
+
+			Assert.That(hub.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+
+			Run(service.Close());
+
+			Assert.That(hub.CurrentRoot!.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+			Assert.That(popup.DestroyCount, Is.EqualTo(1));
+		}
+
+		[Test]
 		public void Open_WithArgs_CreatesTheScreenWithThem()
 		{
 			var opener = new FakeModal(this) { TakesArgs = true };
@@ -372,10 +449,19 @@ namespace Blind.UiMvvm.Tests
 
 		private class FakeModal : ModalScreenOpener<TestScreen, Screen>
 		{
-			public FakeModal(ScreenOpenerTests owner, TestScreen screen = TestScreen.Modal)
-				: base(screen, owner.mWarnings.Add, owner.mErrors.Add)
+			public FakeModal(ScreenOpenerTests owner, TestScreen screen = TestScreen.Modal, ScreenCover cover = default)
+				: base(screen, cover, owner.mWarnings.Add, owner.mErrors.Add)
 			{
 			}
+
+			public ScreenOpening Opening { get; set; } = ScreenOpening.Cover;
+			public bool HasRoot { get; set; }
+
+			public override ScreenOpening DefaultOpening => Opening;
+
+			public VisualElement? CurrentRoot => Root;
+
+			protected override VisualElement? ResolveRoot(Screen instance) => HasRoot ? instance.Root : null;
 
 			public List<string> Calls { get; } = new();
 			public bool PrepareResult { get; set; } = true;

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.7.0
+
+Whether a screen hides the screens beneath it is decided when it opens, so a popup can leave the
+screen under it in view.
+
+### Added
+
+- **`ScreenOpening`**: `Cover` hides every screen visible beneath the new one, `Overlay` leaves them
+  as they are.
+- **`IScreenOpener.DefaultOpening`**, each screen's default. `ScreenOpener` returns `Cover`; a popup
+  overrides it with `Overlay`.
+- **`IScreenService.Open(screen, opening)` and `Open(screen, args, opening)`** override the default
+  for one call. Null keeps the opener's.
+- The stack remembers how each screen was opened. A `Cover` opened over an overlay hides the overlay
+  and every screen showing through it; closing it shows exactly those again.
+- **`ModalScreenOpener(screen, cover, ...)`**, for a modal that is covered by a USS class rather
+  than collapsed.
+
+### Changed - breaking
+
+- **Modals are covered like any screen.** `ScreenCover` moved from `PersistentScreenOpener` into
+  `ScreenOpener`, and the empty `ModalScreenOpener.SetCovered` is gone: a modal under a `Cover` now
+  collapses, through the root its opener returns from `ResolveRoot`. A modal without one logs a
+  warning when covered and stays as it is.
+- `ScreenOpener.SetCovered` is virtual, not abstract.
+- A hand-written `IScreenOpener` implements `DefaultOpening`, and a hand-written `IScreenService`
+  takes the `opening` parameter. Openers deriving from `ScreenOpener` or `StubScreenOpener` need no
+  change.
+
+### Tests
+
+- `ScreenServiceTests` cover an overlay over a persistent screen, a cover over an overlay, an
+  overlay over a cover, and overriding the default in both directions.
+- `ScreenOpenerTests` cover hiding a modal through its cover, a modal with no root, and a service
+  driving a modal over a modal and an overlay over the hub.
+
 ## 0.6.0
 
 Screens can be given data: opened with it, or handed it while already open.

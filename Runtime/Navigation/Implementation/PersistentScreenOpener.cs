@@ -15,31 +15,19 @@ namespace Blind.UiMvvm.Navigation.Implementation
 		where TScreen : struct, Enum
 		where TInstance : class
 	{
-		private readonly ScreenCover mCover;
-
 		protected PersistentScreenOpener(
 			TScreen screen,
 			ScreenCover cover = default,
 			Action<string>? logWarning = null,
 			Action<string>? logError = null)
-			: base(screen, logWarning, logError)
+			: base(screen, cover, logWarning, logError)
 		{
-			mCover = cover;
 		}
 
 		protected sealed override bool ReusesInstance => true;
 
 		/// <summary>Mandatory here: a screen that hides by styling its root cannot do it without one.</summary>
 		protected abstract override VisualElement? ResolveRoot(TInstance instance);
-
-		public override void SetCovered(bool covered)
-		{
-			var root = Root;
-			if (root == null)
-				return;
-
-			mCover.Apply(root, covered);
-		}
 
 		protected override void OnPushed() => SetCovered(false);
 

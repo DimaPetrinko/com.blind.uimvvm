@@ -28,24 +28,42 @@ namespace Blind.UiMvvm.Navigation.Implementation
 	/// A modal is destroyed and a persistent screen hidden again, so the failure cannot strand a visible
 	/// screen nothing will close, or leave a modal that refuses every later open as already open. The
 	/// exception still reaches the caller, which decides what the failure means for its flow.
+	///
+	/// <b>Any screen can be covered.</b> Whether opening a screen hides the ones beneath it is decided
+	/// by that opening (<see cref="DefaultOpening"/>, or the open call). How a covered screen looks is
+	/// this opener's <see cref="ScreenCover"/>, applied to the root from <see cref="ResolveRoot"/>.
 	/// </summary>
 	public abstract class ScreenOpener<TScreen, TInstance> : IScreenOpener<TScreen>
 		where TScreen : struct, Enum
 		where TInstance : class
 	{
+		private readonly ScreenCover mCover;
 		private readonly Action<string> mLogWarning;
 		private readonly Action<string> mLogError;
 
 		private TInstance? mInstance;
 
 		protected ScreenOpener(TScreen screen, Action<string>? logWarning = null, Action<string>? logError = null)
+			: this(screen, ScreenCover.Display, logWarning, logError)
+		{
+		}
+
+		protected ScreenOpener(
+			TScreen screen,
+			ScreenCover cover,
+			Action<string>? logWarning = null,
+			Action<string>? logError = null)
 		{
 			Screen = screen;
+			mCover = cover;
 			mLogWarning = logWarning ?? (message => UnityEngine.Debug.LogWarning(message));
 			mLogError = logError ?? (message => UnityEngine.Debug.LogError(message));
 		}
 
 		public TScreen Screen { get; }
+
+		/// <summary><see cref="ScreenOpening.Cover"/>. A popup overrides it with <see cref="ScreenOpening.Overlay"/>.</summary>
+		public virtual ScreenOpening DefaultOpening => ScreenOpening.Cover;
 
 		/// <summary>The live screen, or null before the first open, after a modal close, or once it has been destroyed.</summary>
 		protected TInstance? Instance
@@ -131,7 +149,25 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			return instance != null && DeliverTo(instance, args);
 		}
 
-		public abstract void SetCovered(bool covered);
+		/// <summary>
+		/// Applies this opener's <see cref="ScreenCover"/> to the live screen's root. A live screen whose
+		/// root cannot be resolved stays as it is, with a warning.
+		/// </summary>
+		public virtual void SetCovered(bool covered)
+		{
+			var instance = Instance;
+			if (instance == null)
+				return;
+
+			var root = ResolveRoot(instance);
+			if (root == null)
+			{
+				mLogWarning($"{GetType().Name} resolves no root, so the {Screen} screen cannot be {(covered ? "hidden" : "shown")}");
+				return;
+			}
+
+			mCover.Apply(root, covered);
+		}
 
 		/// <summary>Instantiates the screen. Return null to decline; the base logs that as a fault.</summary>
 		protected abstract TInstance? CreateScreen();
@@ -156,6 +192,7 @@ namespace Blind.UiMvvm.Navigation.Implementation
 		/// <summary>The screen's own binder, resolved from whatever scope the screen brought with it.</summary>
 		protected abstract IViewBinder? ResolveBinder(TInstance instance);
 
+		/// <summary>The element <see cref="SetCovered"/> hides. Without one the screen cannot be covered.</summary>
 		protected virtual VisualElement? ResolveRoot(TInstance instance) => null;
 
 		/// <summary>

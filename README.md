@@ -264,6 +264,33 @@ protected override bool DeliverTo(ShopScreen screen, object args)
 }
 ```
 
+### Covering and overlays
+
+Whether a screen hides the screens beneath it is decided when it opens, not by the screens beneath:
+
+```csharp
+public enum ScreenOpening { Cover, Overlay }
+
+await service.Open(ScreenId.Shop);                                   // the opener's default
+await service.Open(ScreenId.Shop, ScreenOpening.Overlay);            // this call only
+await service.Open(ScreenId.Popup, args, ScreenOpening.Cover);       // with args
+```
+
+- **Each opener sets its screen's default** in `DefaultOpening`. `ScreenOpener` returns `Cover`; a
+  popup overrides it:
+
+  ```csharp
+  public override ScreenOpening DefaultOpening => ScreenOpening.Overlay;
+  ```
+
+- **A call can override it** with its last argument. Null, the default, keeps the opener's.
+- **`Cover` hides every screen visible beneath it**: the one below, and the ones showing through any
+  overlays under that. Closing it shows exactly those again.
+- **`Overlay` touches nothing**, so a hub under a popup stays in view.
+
+How a covered screen looks is its own opener's `ScreenCover` (below). Modal and persistent screens
+are covered alike.
+
 ### Writing an opener
 
 `ScreenOpener<TScreen, TInstance>` owns the shared skeleton - is there a live instance, create it,
@@ -274,8 +301,11 @@ bind it in that same call, report a refusal - and two subclasses own the lifetim
 | `ModalScreenOpener` | refused | `DestroyScreen` |
 | `PersistentScreenOpener` | reuses the instance | covers it, per its `ScreenCover` |
 
-`ScreenCover.Display` collapses the screen; `ScreenCover.UssClass("hidden")` toggles a class, so the
-stylesheet decides what covered looks like and can transition into it.
+Every opener takes a `ScreenCover`, collapse by default. `ScreenCover.Display` collapses the screen;
+`ScreenCover.UssClass("hidden")` toggles a class, so the stylesheet decides what covered looks like
+and can transition into it. The cover is applied to the element `ResolveRoot` returns: mandatory for
+a persistent screen, and needed by a modal once anything can open over it with `Cover`. A live screen
+with no root logs a warning instead of hiding.
 
 ```csharp
 internal class ShopScreenOpener : ModalScreenOpener<ScreenId, ShopScreen>

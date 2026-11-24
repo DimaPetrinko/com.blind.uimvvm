@@ -21,6 +21,8 @@ namespace Blind.UiMvvm.Navigation.Implementation
 
 		public TScreen Screen { get; }
 
+		public ScreenOpening DefaultOpening => ScreenOpening.Cover;
+
 		public UniTask<bool> Open(object? args = null)
 		{
 			mLog($"{Screen} screen is not implemented yet");

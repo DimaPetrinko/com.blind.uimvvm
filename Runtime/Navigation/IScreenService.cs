@@ -15,6 +15,10 @@ namespace Blind.UiMvvm.Navigation
 	/// the transition still runs, and still runs synchronously when every opener involved is
 	/// synchronous.
 	///
+	/// Opening a screen hides the screens beneath it, or leaves them in view, per
+	/// <see cref="ScreenOpening"/>: the opener's <see cref="IScreenOpener{TScreen}.DefaultOpening"/>
+	/// unless the call passes one. Closing it shows again exactly what its opening hid.
+	///
 	/// A screen that needs data is given it as args: <see cref="Open{TArgs}"/> hands them to the
 	/// opener that creates the screen, and <see cref="Deliver{TArgs}"/> hands them to a screen that is
 	/// already open. What the args mean, and how they reach the screen, is the opener's business.
@@ -27,10 +31,17 @@ namespace Blind.UiMvvm.Navigation
 		/// <summary>True while the screen is anywhere in the stack, covered or not.</summary>
 		bool IsOpen(TScreen screen);
 
-		UniTask<bool> Open(TScreen screen);
+		/// <summary>
+		/// Opens the screen. <paramref name="opening"/> overrides whether it hides the screens beneath
+		/// it; null keeps the opener's <see cref="IScreenOpener{TScreen}.DefaultOpening"/>.
+		/// </summary>
+		UniTask<bool> Open(TScreen screen, ScreenOpening? opening = null);
 
-		/// <summary>Opens the screen with data. The opener decides whether it accepts that type.</summary>
-		UniTask<bool> Open<TArgs>(TScreen screen, TArgs args) where TArgs : class;
+		/// <summary>
+		/// Opens the screen with data. The opener decides whether it accepts that type.
+		/// <paramref name="opening"/> works as in <see cref="Open(TScreen, ScreenOpening?)"/>.
+		/// </summary>
+		UniTask<bool> Open<TArgs>(TScreen screen, TArgs args, ScreenOpening? opening = null) where TArgs : class;
 
 		/// <summary>
 		/// Hands data to a screen that is already open, anywhere in the stack. Not a transition: nothing

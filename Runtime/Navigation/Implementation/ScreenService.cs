@@ -12,6 +12,10 @@ namespace Blind.UiMvvm.Navigation.Implementation
 	/// is the consuming project's enum; this only knows how to key openers by it and in what order they
 	/// were opened.
 	///
+	/// Each entry remembers how it was opened. A <see cref="ScreenOpening.Cover"/> hides every screen
+	/// visible beneath it - the one below, and the ones showing through any overlays under that - and
+	/// closing it shows exactly those again. An <see cref="ScreenOpening.Overlay"/> touches nothing.
+	///
 	/// The default value of <typeparamref name="TScreen"/> is reserved as "no screen": give the enum a
 	/// zero member such as <c>None</c> so an unset or defaulted field can never name a real screen.
 	///
@@ -31,7 +35,7 @@ namespace Blind.UiMvvm.Navigation.Implementation
 		private static readonly EqualityComparer<TScreen> s_comparer = EqualityComparer<TScreen>.Default;
 
 		private readonly IReadOnlyDictionary<TScreen, IScreenOpener<TScreen>> mOpeners;
-		private readonly List<TScreen> mStack = new();
+		private readonly List<(TScreen Screen, ScreenOpening Opening)> mStack = new();
 		private readonly Action<string> mLogWarning;
 		private readonly Action<string> mLogError;
 
@@ -59,18 +63,18 @@ namespace Blind.UiMvvm.Navigation.Implementation
 				.ToDictionary(group => group.Key, group => group.Last());
 		}
 
-		public TScreen Current => mStack.Count > 0 ? mStack[mStack.Count - 1] : default;
+		public TScreen Current => mStack.Count > 0 ? mStack[mStack.Count - 1].Screen : default;
 
-		public bool IsOpen(TScreen screen) => mStack.Contains(screen);
+		public bool IsOpen(TScreen screen) => mStack.Exists(entry => s_comparer.Equals(entry.Screen, screen));
 
-		public UniTask<bool> Open(TScreen screen) => OpenWith(screen, null);
+		public UniTask<bool> Open(TScreen screen, ScreenOpening? opening = null) => OpenWith(screen, null, opening);
 
-		public UniTask<bool> Open<TArgs>(TScreen screen, TArgs args) where TArgs : class
+		public UniTask<bool> Open<TArgs>(TScreen screen, TArgs args, ScreenOpening? opening = null) where TArgs : class
 		{
 			if (args == null)
 				throw new ArgumentNullException(nameof(args), $"Open({screen}) with args needs args; use Open({screen}) for none");
 
-			return OpenWith(screen, args);
+			return OpenWith(screen, args, opening);
 		}
 
 		public bool Deliver<TArgs>(TScreen screen, TArgs args) where TArgs : class
@@ -97,7 +101,7 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			return false;
 		}
 
-		private async UniTask<bool> OpenWith(TScreen screen, object? args)
+		private async UniTask<bool> OpenWith(TScreen screen, object? args, ScreenOpening? opening)
 		{
 			if (IsUnset(screen))
 			{
@@ -133,10 +137,11 @@ namespace Blind.UiMvvm.Navigation.Implementation
 				if (!await opener.Open(args))
 					return false;
 
-				if (mStack.Count > 0)
-					mOpeners[Current].SetCovered(true);
+				var resolvedOpening = opening ?? opener.DefaultOpening;
+				if (resolvedOpening == ScreenOpening.Cover)
+					SetVisibleScreensCovered(mStack.Count - 1, true);
 
-				mStack.Add(screen);
+				mStack.Add((screen, resolvedOpening));
 				return true;
 			}
 			finally
@@ -168,17 +173,18 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			mIsTransitioning = true;
 			try
 			{
-				var closing = Current;
-				var revealing = mStack[mStack.Count - 2];
+				var closing = mStack[mStack.Count - 1];
 
 				// Uncovered before the close is awaited, not after, so an exit animation plays over the
-				// screen it is revealing rather than over a hidden one. Popped only once the close has
+				// screens it is revealing rather than over hidden ones. Popped only once the close has
 				// finished, so Current names the screen that is actually on top the whole way through -
 				// or once it has thrown, because the opener tears the screen down either way.
-				mOpeners[revealing].SetCovered(false);
+				if (closing.Opening == ScreenOpening.Cover)
+					SetVisibleScreensCovered(mStack.Count - 2, false);
+
 				try
 				{
-					await mOpeners[closing].Close();
+					await mOpeners[closing.Screen].Close();
 				}
 				finally
 				{
@@ -190,6 +196,18 @@ namespace Blind.UiMvvm.Navigation.Implementation
 			finally
 			{
 				mIsTransitioning = false;
+			}
+		}
+
+		private void SetVisibleScreensCovered(int topIndex, bool covered)
+		{
+			for (var index = topIndex; index >= 0; index--)
+			{
+				var (screen, opening) = mStack[index];
+				mOpeners[screen].SetCovered(covered);
+
+				if (opening == ScreenOpening.Cover)
+					return;
 			}
 		}
 

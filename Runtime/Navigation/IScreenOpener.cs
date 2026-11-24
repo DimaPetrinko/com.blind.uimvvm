@@ -9,8 +9,8 @@ namespace Blind.UiMvvm.Navigation
 	/// touches <see cref="IScreenService{TScreen}"/> or any caller.
 	///
 	/// The service drives all three calls: <see cref="Open"/> when the screen is pushed,
-	/// <see cref="SetCovered"/> when another screen is pushed on top of or popped off it, and
-	/// <see cref="Close"/> when it is popped. What those mean is the screen's business - a modal may
+	/// <see cref="SetCovered"/> when a screen opened with <see cref="ScreenOpening.Cover"/> is pushed on
+	/// top of it or popped off it, and <see cref="Close"/> when it is popped. What those mean is the screen's business - a modal may
 	/// instantiate and destroy itself, while a persistent screen may only show and hide.
 	///
 	/// <see cref="Open"/> and <see cref="Close"/> are awaitable so a screen can load what it needs
@@ -21,6 +21,12 @@ namespace Blind.UiMvvm.Navigation
 	public interface IScreenOpener<TScreen> where TScreen : struct, Enum
 	{
 		TScreen Screen { get; }
+
+		/// <summary>
+		/// Whether opening this screen hides the screens beneath it, when the
+		/// <see cref="IScreenService{TScreen}.Open(TScreen, ScreenOpening?)"/> call does not say.
+		/// </summary>
+		ScreenOpening DefaultOpening { get; }
 
 		/// <summary>
 		/// Shows the screen. Returns false when it declined to open - a stub, or a screen whose
@@ -36,7 +42,10 @@ namespace Blind.UiMvvm.Navigation
 
 		UniTask Close();
 
-		/// <summary>Another screen is now on top of this one, or has just left.</summary>
+		/// <summary>
+		/// A screen opened with <see cref="ScreenOpening.Cover"/> now hides this one, or has just closed.
+		/// An overlay on top does neither.
+		/// </summary>
 		void SetCovered(bool covered);
 	}
 }

@@ -26,6 +26,8 @@ namespace Blind.UiMvvm.Tests
 			public RecordingOpener(TestScreen screen) => Screen = screen;
 
 			public TestScreen Screen { get; }
+			public ScreenOpening DefaultOpening { get; set; } = ScreenOpening.Cover;
+			public int CoverChanges { get; private set; }
 			public int OpenCount { get; private set; }
 			public int CloseCount { get; private set; }
 			public bool IsCovered { get; private set; }
@@ -68,7 +70,11 @@ namespace Blind.UiMvvm.Tests
 					: UniTask.CompletedTask;
 			}
 
-			public void SetCovered(bool covered) => IsCovered = covered;
+			public void SetCovered(bool covered)
+			{
+				IsCovered = covered;
+				CoverChanges++;
+			}
 		}
 
 		private class GatedOpener : IScreenOpener<TestScreen>
@@ -78,6 +84,7 @@ namespace Blind.UiMvvm.Tests
 			public GatedOpener(TestScreen screen) => Screen = screen;
 
 			public TestScreen Screen { get; }
+			public ScreenOpening DefaultOpening => ScreenOpening.Cover;
 			public int OpenCount { get; private set; }
 
 			public UniTask<bool> Open(object args = null)
@@ -105,6 +112,7 @@ namespace Blind.UiMvvm.Tests
 			public GatedCloseOpener(TestScreen screen) => Screen = screen;
 
 			public TestScreen Screen { get; }
+			public ScreenOpening DefaultOpening => ScreenOpening.Cover;
 			public bool IsCovered { get; private set; }
 
 			public UniTask<bool> Open(object args = null) => UniTask.FromResult(true);
@@ -201,6 +209,113 @@ namespace Blind.UiMvvm.Tests
 			Assert.That(hub.IsCovered, Is.False);
 			Assert.That(weapon.CloseCount, Is.EqualTo(1));
 			Assert.That(service.Current, Is.EqualTo(TestScreen.Hub));
+		}
+
+		[Test]
+		public void AnOverlay_LeavesTheScreenBeneathAlone_WhenItOpensAndCloses()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var popup = new RecordingOpener(TestScreen.Modal) { DefaultOpening = ScreenOpening.Overlay };
+			var service = Create(hub, popup);
+			Run(service.Open(TestScreen.Hub));
+
+			Run(service.Open(TestScreen.Modal));
+
+			Assert.That(hub.IsCovered, Is.False);
+			Assert.That(service.Current, Is.EqualTo(TestScreen.Modal));
+
+			Run(service.Close());
+
+			Assert.That(hub.CoverChanges, Is.Zero, "the popup hid or showed the hub");
+			Assert.That(popup.CloseCount, Is.EqualTo(1));
+		}
+
+		[Test]
+		public void Open_WithOverlay_OverridesAnOpenerThatCovers()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var service = Create(hub, shop);
+			Run(service.Open(TestScreen.Hub));
+
+			Run(service.Open(TestScreen.Shop, ScreenOpening.Overlay));
+			Run(service.Close());
+
+			Assert.That(hub.CoverChanges, Is.Zero);
+		}
+
+		[Test]
+		public void Open_WithCover_OverridesAnOpenerThatOverlays()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var popup = new RecordingOpener(TestScreen.Modal) { DefaultOpening = ScreenOpening.Overlay };
+			var service = Create(hub, popup);
+			Run(service.Open(TestScreen.Hub));
+
+			Run(service.Open(TestScreen.Modal, ScreenOpening.Cover));
+
+			Assert.That(hub.IsCovered, Is.True);
+
+			Run(service.Close());
+
+			Assert.That(hub.IsCovered, Is.False);
+		}
+
+		[Test]
+		public void Open_WithArgsAndAnOpening_PassesTheArgs_AndAppliesTheOpening()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var service = Create(hub, shop);
+			Run(service.Open(TestScreen.Hub));
+			var args = new object();
+
+			Run(service.Open(TestScreen.Shop, args, ScreenOpening.Overlay));
+
+			Assert.That(shop.LastOpenArgs, Is.SameAs(args));
+			Assert.That(hub.IsCovered, Is.False);
+		}
+
+		[Test]
+		public void ACoverOverAnOverlay_HidesEveryScreenShowingThrough_AndCloseShowsThemAgain()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var popup = new RecordingOpener(TestScreen.Modal) { DefaultOpening = ScreenOpening.Overlay };
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var service = Create(hub, popup, shop);
+			Run(service.Open(TestScreen.Hub));
+			Run(service.Open(TestScreen.Modal));
+
+			Run(service.Open(TestScreen.Shop));
+
+			Assert.That(popup.IsCovered, Is.True);
+			Assert.That(hub.IsCovered, Is.True, "the hub showed through the popup, so the shop has to hide it too");
+
+			Run(service.Close());
+
+			Assert.That(popup.IsCovered, Is.False);
+			Assert.That(hub.IsCovered, Is.False);
+		}
+
+		[Test]
+		public void AnOverlayOverACover_LeavesTheHiddenScreensHidden()
+		{
+			var hub = new RecordingOpener(TestScreen.Hub);
+			var shop = new RecordingOpener(TestScreen.Shop);
+			var popup = new RecordingOpener(TestScreen.Modal) { DefaultOpening = ScreenOpening.Overlay };
+			var service = Create(hub, shop, popup);
+			Run(service.Open(TestScreen.Hub));
+			Run(service.Open(TestScreen.Shop));
+
+			Run(service.Open(TestScreen.Modal));
+
+			Assert.That(shop.IsCovered, Is.False);
+			Assert.That(hub.IsCovered, Is.True);
+
+			Run(service.Close());
+
+			Assert.That(shop.CoverChanges, Is.Zero);
+			Assert.That(hub.IsCovered, Is.True, "closing the popup showed the hub under the shop");
 		}
 
 		/// <summary>
